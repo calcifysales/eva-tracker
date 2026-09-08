@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Award
 } from "lucide-react";
+import { dataService } from "../services/dataService.js";
 
 export default function AgentDashboard({ user, onLogout }) {
   const [rows, setRows] = useState([]);
@@ -44,17 +45,14 @@ export default function AgentDashboard({ user, onLogout }) {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  const fetchAgentRows = async () => {
+  const fetchAgentRows = () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/entries?role=agent&mobile=${encodeURIComponent(user.mobile)}`);
-      const data = await res.json();
-      if (res.ok) {
-        setRows(data.rows || []);
-        setKpiSettings(data.kpiSettings);
-        if (data.agentRank) {
-          setAgentRank(data.agentRank);
-        }
+      const data = dataService.getKpiData({ role: "agent", mobile: user.mobile });
+      setRows(data.rows || []);
+      setKpiSettings(data.kpiSettings);
+      if (data.agentRank) {
+        setAgentRank(data.agentRank);
       }
     } catch (err) {
       console.error("Failed to load agent entries:", err);
@@ -70,22 +68,15 @@ export default function AgentDashboard({ user, onLogout }) {
   }, [user?.mobile]);
 
   // Toggle Valid (Yes / No) - Editable by Agent
-  const handleToggleValid = async (row) => {
+  const handleToggleValid = (row) => {
     const newStatus = row.isValid === "Yes" ? "No" : "Yes";
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kpiType: row.kpiType,
-          isValid: newStatus
-        })
+      dataService.updateKpiRow(row.entryId, {
+        kpiType: row.kpiType,
+        isValid: newStatus
       });
-      if (res.ok) {
-        // Refresh rows
-        fetchAgentRows();
-      }
+      fetchAgentRows();
     } catch (err) {
       console.error("Failed to update status:", err);
     } finally {
@@ -94,21 +85,15 @@ export default function AgentDashboard({ user, onLogout }) {
   };
 
   // Save TPV - Editable by Agent
-  const handleSaveTpv = async (row) => {
+  const handleSaveTpv = (row) => {
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kpiType: row.kpiType,
-          tpv: Number(tempTpvValue) || 0
-        })
+      dataService.updateKpiRow(row.entryId, {
+        kpiType: row.kpiType,
+        tpv: Number(tempTpvValue) || 0
       });
-      if (res.ok) {
-        fetchAgentRows();
-        setEditingTpvRowId(null);
-      }
+      fetchAgentRows();
+      setEditingTpvRowId(null);
     } catch (err) {
       console.error("Failed to save TPV:", err);
     } finally {
@@ -117,23 +102,16 @@ export default function AgentDashboard({ user, onLogout }) {
   };
 
   // Delete entry with caution modal
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!deletingRow) return;
     setDeleteLoading(true);
     setDeleteError("");
 
     try {
-      const res = await fetch(
-        `/api/entries/${deletingRow.entryId}?role=agent&mobile=${encodeURIComponent(user.mobile)}`,
-        { method: "DELETE" }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to remove entry.");
-      }
-
+      dataService.deleteEntry(deletingRow.entryId, { role: "agent", mobile: user.mobile });
       setRows((prev) => prev.filter((r) => r.entryId !== deletingRow.entryId));
       setDeletingRow(null);
+      fetchAgentRows();
     } catch (err) {
       setDeleteError(err.message || "Failed to delete.");
     } finally {

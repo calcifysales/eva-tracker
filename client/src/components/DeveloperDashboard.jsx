@@ -29,6 +29,7 @@ import ZHDashboard from "./ZHDashboard.jsx";
 import CMDashboard from "./CMDashboard.jsx";
 import AgentDashboard from "./AgentDashboard.jsx";
 import BulkUploadModal from "./BulkUploadModal.jsx";
+import { dataService } from "../services/dataService.js";
 
 export default function DeveloperDashboard({ user, onLogout }) {
   // Navigation: "studio" | "zh_view" | "cm_view" | "agent_view"
@@ -81,21 +82,21 @@ export default function DeveloperDashboard({ user, onLogout }) {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiResponse, setAiResponse] = useState(null);
 
-  const loadData = async () => {
+  const loadData = () => {
     setLoading(true);
     try {
-      const [uRes, eRes] = await Promise.all([
-        fetch("/api/admin/users?role=developer"),
-        fetch("/api/entries?role=developer")
-      ]);
-      const uData = await uRes.json();
-      const eData = await eRes.json();
+      const allUsers = dataService.getUsers();
+      const uData = {
+        cms: allUsers.filter((u) => u.role === "cm"),
+        agents: allUsers.filter((u) => u.role === "agent")
+      };
 
       setUsers(uData);
       if (uData.agents?.length > 0 && !selectedAgentAce) {
         setSelectedAgentAce(uData.agents[0].mobile);
       }
 
+      const eData = dataService.getKpiData({ role: "developer" });
       setRows(eData.rows || []);
       if (eData.kpiSettings) {
         const s = eData.kpiSettings;
@@ -123,7 +124,7 @@ export default function DeveloperDashboard({ user, onLogout }) {
   }, []);
 
   // Save settings (Rates & Points)
-  const handleSaveRates = async () => {
+  const handleSaveRates = () => {
     setSavingSettings(true);
     setSettingsSuccess(false);
     try {
@@ -147,17 +148,10 @@ export default function DeveloperDashboard({ user, onLogout }) {
         }
       };
 
-      const res = await fetch("/api/kpi-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedPayload)
-      });
-
-      if (res.ok) {
-        setSettingsSuccess(true);
-        loadData();
-        setTimeout(() => setSettingsSuccess(false), 3000);
-      }
+      dataService.updateSettings(updatedPayload);
+      setSettingsSuccess(true);
+      loadData();
+      setTimeout(() => setSettingsSuccess(false), 3000);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -166,39 +160,28 @@ export default function DeveloperDashboard({ user, onLogout }) {
   };
 
   // Delete single submission
-  const handleConfirmDeleteRow = async () => {
+  const handleConfirmDeleteRow = () => {
     if (!deletingRow) return;
     setDeleteRowLoading(true);
     setDeleteRowError("");
     try {
-      const res = await fetch(`/api/entries/${deletingRow.entryId}?role=developer`, {
-        method: "DELETE"
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDeletingRow(null);
-        loadData();
-      } else {
-        setDeleteRowError(data.error || "Failed to delete submission.");
-      }
+      dataService.deleteEntry(deletingRow.entryId, { role: "developer" });
+      setDeletingRow(null);
+      loadData();
     } catch (err) {
-      setDeleteRowError("Network error while deleting submission.");
+      setDeleteRowError(err.message || "Failed to delete submission.");
     } finally {
       setDeleteRowLoading(false);
     }
   };
 
   // Clear all submissions
-  const handleConfirmClearAll = async () => {
+  const handleConfirmClearAll = () => {
     setClearAllLoading(true);
     try {
-      const res = await fetch("/api/admin/entries/all?role=developer", {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        setClearAllModalOpen(false);
-        loadData();
-      }
+      dataService.deleteAllEntries("developer");
+      setClearAllModalOpen(false);
+      loadData();
     } catch (err) {
       console.error("Failed to clear entries:", err);
     } finally {
@@ -207,17 +190,13 @@ export default function DeveloperDashboard({ user, onLogout }) {
   };
 
   // Delete user account
-  const handleConfirmDeleteUser = async () => {
+  const handleConfirmDeleteUser = () => {
     if (!deletingUser) return;
     setDeleteUserLoading(true);
     try {
-      const res = await fetch(`/api/admin/users/${deletingUser.id}?role=developer`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        setDeletingUser(null);
-        loadData();
-      }
+      dataService.deleteUser(deletingUser.id, { role: "developer" });
+      setDeletingUser(null);
+      loadData();
     } catch (err) {
       console.error("Failed to delete user:", err);
     } finally {
@@ -226,14 +205,10 @@ export default function DeveloperDashboard({ user, onLogout }) {
   };
 
   // Toggle Valid (Yes/No)
-  const handleToggleValid = async (row) => {
+  const handleToggleValid = (row) => {
     const newStatus = row.isValid === "Yes" ? "No" : "Yes";
     try {
-      await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kpiType: row.kpiType, isValid: newStatus })
-      });
+      dataService.updateKpiRow(row.entryId, { kpiType: row.kpiType, isValid: newStatus });
       loadData();
     } catch (err) {
       console.error(err);
@@ -241,17 +216,11 @@ export default function DeveloperDashboard({ user, onLogout }) {
   };
 
   // Generate sample activities
-  const handleGenerateSample = async () => {
+  const handleGenerateSample = () => {
     setGenerating(true);
     setGenNotice("");
     try {
-      const res = await fetch("/api/admin/generate-sample-activities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count: genCount, role: "developer" })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation failed.");
+      const data = dataService.generateSampleActivities(genCount);
       setGenNotice(`✓ ${data.message}`);
       loadData();
       setTimeout(() => setGenNotice(""), 4000);
@@ -263,20 +232,13 @@ export default function DeveloperDashboard({ user, onLogout }) {
   };
 
   // AI Assistant runner
-  const handleRunAiAssistant = async (customPrompt) => {
+  const handleRunAiAssistant = (customPrompt) => {
     const query = customPrompt || aiPrompt;
     if (!query) return;
     setAiGenerating(true);
     try {
-      const res = await fetch("/api/ai/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "developer", prompt: query })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setAiResponse(data);
-      }
+      const data = dataService.analyzeAI({ role: "developer", prompt: query });
+      setAiResponse(data);
     } catch (err) {
       console.error(err);
     } finally {

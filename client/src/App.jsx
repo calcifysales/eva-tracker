@@ -19,6 +19,7 @@ import CMDashboard from "./components/CMDashboard.jsx";
 import ZHDashboard from "./components/ZHDashboard.jsx";
 import DeveloperDashboard from "./components/DeveloperDashboard.jsx";
 import { AgentAuthModal, AdminAuthModal } from "./components/AuthModals.jsx";
+import { dataService } from "./services/dataService.js";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -57,13 +58,10 @@ export default function App() {
   // 3 Horizontal lines menu drawer
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
 
-  const fetchMeta = async () => {
+  const fetchMeta = () => {
     try {
-      const res = await fetch("/api/public/meta");
-      const data = await res.json();
-      if (res.ok) {
-        setMeta(data);
-      }
+      const data = dataService.getMeta();
+      setMeta(data);
     } catch (err) {
       console.error("Failed to load metadata:", err);
     }

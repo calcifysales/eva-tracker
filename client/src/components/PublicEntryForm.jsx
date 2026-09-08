@@ -14,6 +14,7 @@ import {
   TrendingUp,
   ShieldCheck
 } from "lucide-react";
+import { dataService } from "../services/dataService.js";
 
 export default function PublicEntryForm({ onBackToLanding }) {
   const today = new Date().toISOString().split("T")[0];
@@ -38,12 +39,12 @@ export default function PublicEntryForm({ onBackToLanding }) {
 
   // Fetch dynamic formQuestions configured by ZH
   useEffect(() => {
-    fetch("/api/public/meta")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data) setMeta(data);
-      })
-      .catch((err) => console.error("Could not load form config:", err));
+    try {
+      const data = dataService.getMeta();
+      if (data) setMeta(data);
+    } catch (err) {
+      console.error("Could not load form config:", err);
+    }
   }, []);
 
   // Live duplicate check SCOPED BY ACTIVITY (Merchant ID + Store ID + Activity)
@@ -53,16 +54,13 @@ export default function PublicEntryForm({ onBackToLanding }) {
       return;
     }
 
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       try {
-        const res = await fetch(
-          `/api/entries/check-duplicate?merchantId=${encodeURIComponent(
-            formData.merchantId.trim()
-          )}&storeId=${encodeURIComponent(
-            formData.storeId.trim()
-          )}&activity=${encodeURIComponent(formData.activity)}`
-        );
-        const data = await res.json();
+        const data = dataService.checkDuplicate({
+          merchantId: formData.merchantId.trim(),
+          storeId: formData.storeId.trim(),
+          activity: formData.activity
+        });
         if (data.exists) {
           setDuplicateWarning(data);
         } else {
@@ -71,12 +69,12 @@ export default function PublicEntryForm({ onBackToLanding }) {
       } catch (err) {
         console.error("Duplicate check failed:", err);
       }
-    }, 400);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [formData.merchantId, formData.storeId, formData.activity]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -91,17 +89,7 @@ export default function PublicEntryForm({ onBackToLanding }) {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Submission failed.");
-      }
-
+      dataService.submitEntry(formData);
       setSubmitSuccess(true);
     } catch (err) {
       setErrorMsg(err.message || "Failed to submit form.");

@@ -11,6 +11,7 @@ import {
   Crown,
   UserCheck
 } from "lucide-react";
+import { dataService } from "../services/dataService.js";
 
 export const CM_PRESET_NAMES = [
   "Sriteja Mallepalli",
@@ -53,31 +54,19 @@ export function AgentAuthModal({ isOpen, onClose, onLoginSuccess, meta }) {
     setLoading(true);
 
     try {
-      const endpoint = isSignup ? "/api/auth/agent/signup" : "/api/auth/agent/login";
-      const body = isSignup
-        ? {
+      const res = isSignup
+        ? dataService.auth.agentSignup({
             mobile: mobile.trim(),
             name: name.trim(),
             clusterManager: clusterManager.trim(),
             pin: pin.trim()
-          }
-        : {
+          })
+        : dataService.auth.agentLogin({
             mobile: mobile.trim(),
             pin: pin.trim()
-          };
+          });
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Authentication failed.");
-      }
-
-      onLoginSuccess(data.user);
+      onLoginSuccess(res.user);
       onClose();
     } catch (err) {
       setErrorMsg(err.message || "Failed to authenticate.");
@@ -276,31 +265,20 @@ export function AdminAuthModal({ isOpen, onClose, role = "zh", quotas, onLoginSu
     setLoading(true);
 
     try {
-      const endpoint = isRegister ? "/api/auth/admin/register" : "/api/auth/admin/login";
-      const body = isRegister
-        ? {
+      const res = isRegister
+        ? dataService.auth.adminRegister({
             role,
             name: name.trim(),
             email: email.trim(),
             password: password.trim()
-          }
-        : {
+          })
+        : dataService.auth.adminLogin({
             email: email.trim(),
-            password: password.trim()
-          };
+            password: password.trim(),
+            role
+          });
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Authentication failed.");
-      }
-
-      onLoginSuccess(data.user);
+      onLoginSuccess(res.user);
       onClose();
     } catch (err) {
       setErrorMsg(err.message || "Operation failed.");

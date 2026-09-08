@@ -15,6 +15,7 @@ import {
   Trash2,
   Edit2
 } from "lucide-react";
+import { dataService } from "../services/dataService.js";
 
 export default function CMDashboard({ user, onLogout }) {
   const [rows, setRows] = useState([]);
@@ -61,25 +62,21 @@ export default function CMDashboard({ user, onLogout }) {
   const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [aiDirectAnswer, setAiDirectAnswer] = useState(null);
 
-  const fetchCMData = async () => {
+  const fetchCMData = () => {
     setLoading(true);
     try {
-      const resRows = await fetch(
-        `/api/entries?role=cm&clusterManager=${encodeURIComponent(user.name)}`
-      );
-      const dataRows = await resRows.json();
-      if (resRows.ok) {
-        setRows(dataRows.rows || []);
-        setKpiSettings(dataRows.kpiSettings);
-      }
+      const dataRows = dataService.getKpiData({
+        role: "cm",
+        clusterManager: user.name
+      });
+      setRows(dataRows.rows || []);
+      setKpiSettings(dataRows.kpiSettings);
 
-      const resAgents = await fetch(
-        `/api/agents?role=cm&clusterManager=${encodeURIComponent(user.name)}`
+      const allUsers = dataService.getUsers();
+      const myAgents = allUsers.filter(
+        (u) => u.role === "agent" && (u.clusterManager || "").toLowerCase() === (user.name || "").toLowerCase()
       );
-      const dataAgents = await resAgents.json();
-      if (resAgents.ok) {
-        setAgents(dataAgents.agents || []);
-      }
+      setAgents(myAgents);
     } catch (err) {
       console.error("Failed to load CM data:", err);
     } finally {
@@ -93,23 +90,16 @@ export default function CMDashboard({ user, onLogout }) {
     }
   }, [user?.name]);
 
-  const runAiAnalysis = async (customQ = null) => {
+  const runAiAnalysis = (customQ = null) => {
     setAiLoading(true);
     try {
-      const res = await fetch("/api/ai/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: "cm",
-          clusterManager: user.name,
-          prompt: customQ || aiCustomPrompt
-        })
+      const data = dataService.analyzeAI({
+        role: "cm",
+        clusterManager: user.name,
+        prompt: customQ || aiCustomPrompt
       });
-      const data = await res.json();
-      if (res.ok) {
-        setAiData(data);
-        if (customQ || aiCustomPrompt) setAiDirectAnswer(data.directAnswer);
-      }
+      setAiData(data);
+      if (customQ || aiCustomPrompt) setAiDirectAnswer(data.directAnswer);
     } catch (err) {
       console.error("AI failed:", err);
     } finally {
@@ -117,16 +107,12 @@ export default function CMDashboard({ user, onLogout }) {
     }
   };
 
-  const handleToggleValid = async (row) => {
+  const handleToggleValid = (row) => {
     const newStatus = row.isValid === "Yes" ? "No" : "Yes";
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kpiType: row.kpiType, isValid: newStatus })
-      });
-      if (res.ok) fetchCMData();
+      dataService.updateKpiRow(row.entryId, { kpiType: row.kpiType, isValid: newStatus });
+      fetchCMData();
     } catch (err) {
       console.error(err);
     } finally {
@@ -134,18 +120,12 @@ export default function CMDashboard({ user, onLogout }) {
     }
   };
 
-  const handleSaveTpv = async (row) => {
+  const handleSaveTpv = (row) => {
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kpiType: row.kpiType, tpv: Number(tempTpvValue) || 0 })
-      });
-      if (res.ok) {
-        fetchCMData();
-        setEditingTpvRowId(null);
-      }
+      dataService.updateKpiRow(row.entryId, { kpiType: row.kpiType, tpv: Number(tempTpvValue) || 0 });
+      fetchCMData();
+      setEditingTpvRowId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -153,20 +133,19 @@ export default function CMDashboard({ user, onLogout }) {
     }
   };
 
-  const handleSaveAgentName = async (e) => {
+  const handleSaveAgentName = (e) => {
     e.preventDefault();
     if (!editingAgent || !editAgentNameVal.trim()) return;
     setAgentSaving(true);
     try {
-      const res = await fetch(`/api/agents/${editingAgent.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editAgentNameVal.trim() })
-      });
-      if (res.ok) {
-        setEditingAgent(null);
-        fetchCMData();
+      const users = dataService.getUsers();
+      const target = users.find((u) => u.id === editingAgent.id);
+      if (target) {
+        target.name = editAgentNameVal.trim();
+        dataService.saveUsers(users);
       }
+      setEditingAgent(null);
+      fetchCMData();
     } catch (err) {
       console.error(err);
     } finally {
@@ -175,18 +154,13 @@ export default function CMDashboard({ user, onLogout }) {
   };
 
   // CM user removal handler
-  const handleConfirmDeleteAgent = async () => {
+  const handleConfirmDeleteAgent = () => {
     if (!deletingAgent) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(
-        `/api/admin/users/${deletingAgent.id}?role=cm&cmName=${encodeURIComponent(user.name)}`,
-        { method: "DELETE" }
-      );
-      if (res.ok) {
-        setDeletingAgent(null);
-        fetchCMData();
-      }
+      dataService.deleteUser(deletingAgent.id, { role: "cm", cmName: user.name });
+      setDeletingAgent(null);
+      fetchCMData();
     } catch (err) {
       console.error("Failed to remove agent:", err);
     } finally {
@@ -195,19 +169,12 @@ export default function CMDashboard({ user, onLogout }) {
   };
 
   // Form submission deletion handler
-  const handleConfirmDeleteRow = async () => {
+  const handleConfirmDeleteRow = () => {
     if (!deletingRow) return;
     setDeleteRowLoading(true);
     setDeleteRowError("");
     try {
-      const res = await fetch(
-        `/api/entries/${deletingRow.entryId}?role=cm&cmName=${encodeURIComponent(user.name)}`,
-        { method: "DELETE" }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to delete submission.");
-      }
+      dataService.deleteEntry(deletingRow.entryId, { role: "cm", cmName: user.name });
       setRows((prev) => prev.filter((r) => r.entryId !== deletingRow.entryId));
       setDeletingRow(null);
       fetchCMData();

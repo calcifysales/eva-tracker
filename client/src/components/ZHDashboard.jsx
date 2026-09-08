@@ -23,6 +23,7 @@ import {
   UploadCloud
 } from "lucide-react";
 import BulkUploadModal from "./BulkUploadModal.jsx";
+import { dataService } from "../services/dataService.js";
 
 export default function ZHDashboard({ user, onLogout }) {
   const [rows, setRows] = useState([]);
@@ -72,17 +73,14 @@ export default function ZHDashboard({ user, onLogout }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiData, setAiData] = useState(null);
 
-  const fetchZHData = async () => {
+  const fetchZHData = () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/entries?role=zh");
-      const data = await res.json();
-      if (res.ok) {
-        setRows(data.rows || []);
-        setKpiSettings(data.kpiSettings);
-        setEditEvaRate(data.kpiSettings?.evaRate || 82);
-        setFormQuestions(data.kpiSettings?.formQuestions || null);
-      }
+      const data = dataService.getKpiData({ role: "zh" });
+      setRows(data.rows || []);
+      setKpiSettings(data.kpiSettings);
+      setEditEvaRate(data.kpiSettings?.evaRate || 82);
+      setFormQuestions(data.kpiSettings?.formQuestions || null);
     } catch (err) {
       console.error("Failed to load ZH entries:", err);
     } finally {
@@ -90,14 +88,14 @@ export default function ZHDashboard({ user, onLogout }) {
     }
   };
 
-  const fetchRoster = async () => {
+  const fetchRoster = () => {
     setRosterLoading(true);
     try {
-      const res = await fetch("/api/admin/users?role=zh");
-      const data = await res.json();
-      if (res.ok) {
-        setRosterData(data);
-      }
+      const users = dataService.getUsers();
+      setRosterData({
+        cms: users.filter((u) => u.role === "cm"),
+        agents: users.filter((u) => u.role === "agent")
+      });
     } catch (err) {
       console.error("Failed to load user roster:", err);
     } finally {
@@ -115,28 +113,20 @@ export default function ZHDashboard({ user, onLogout }) {
     }
   }, [activeTab]);
 
-  const handleSaveFormAndKpiSettings = async (e) => {
+  const handleSaveFormAndKpiSettings = (e) => {
     e?.preventDefault();
     setSavingSettings(true);
     setSettingsSuccess(false);
 
     try {
-      const payload = {
+      dataService.updateSettings({
         evaRate: Number(editEvaRate) || 82,
         formQuestions: formQuestions
-      };
-
-      const res = await fetch("/api/kpi-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
-        setSettingsSuccess(true);
-        fetchZHData();
-        setTimeout(() => setSettingsSuccess(false), 2500);
-      }
+      setSettingsSuccess(true);
+      fetchZHData();
+      setTimeout(() => setSettingsSuccess(false), 2500);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -144,58 +134,46 @@ export default function ZHDashboard({ user, onLogout }) {
     }
   };
 
-  const handleConfirmDeleteUser = async () => {
+  const handleConfirmDeleteUser = () => {
     if (!deletingUser) return;
     try {
-      const res = await fetch(`/api/admin/users/${deletingUser.id}?role=zh`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        fetchRoster();
-        fetchZHData();
-        setDeletingUser(null);
-      }
+      dataService.deleteUser(deletingUser.id, { role: "zh" });
+      fetchRoster();
+      fetchZHData();
+      setDeletingUser(null);
     } catch (err) {
       console.error("Failed to delete user:", err);
     }
   };
 
-  const handleConfirmDeleteRow = async () => {
+  const handleConfirmDeleteRow = () => {
     if (!deletingRow) return;
     setDeleteRowLoading(true);
     setDeleteRowError("");
     try {
-      const res = await fetch(`/api/entries/${deletingRow.entryId}?role=zh`, {
-        method: "DELETE"
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setDeletingRow(null);
-        fetchZHData();
-      } else {
-        setDeleteRowError(data.error || "Failed to delete submission.");
-      }
+      dataService.deleteEntry(deletingRow.entryId, { role: "zh" });
+      setDeletingRow(null);
+      fetchZHData();
     } catch (err) {
-      setDeleteRowError("Network error while deleting submission.");
+      setDeleteRowError(err.message || "Failed to delete submission.");
     } finally {
       setDeleteRowLoading(false);
     }
   };
 
   const handleDownloadExcel = () => {
-    window.open("/api/export/excel", "_blank");
+    try {
+      dataService.exportToExcel();
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
   };
 
-  const runAiAnalysis = async () => {
+  const runAiAnalysis = () => {
     setAiLoading(true);
     try {
-      const res = await fetch("/api/ai/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "zh" })
-      });
-      const data = await res.json();
-      if (res.ok) setAiData(data);
+      const data = dataService.analyzeAI({ role: "zh" });
+      setAiData(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -203,16 +181,12 @@ export default function ZHDashboard({ user, onLogout }) {
     }
   };
 
-  const handleToggleValid = async (row) => {
+  const handleToggleValid = (row) => {
     const newStatus = row.isValid === "Yes" ? "No" : "Yes";
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kpiType: row.kpiType, isValid: newStatus })
-      });
-      if (res.ok) fetchZHData();
+      dataService.updateKpiRow(row.entryId, { kpiType: row.kpiType, isValid: newStatus });
+      fetchZHData();
     } catch (err) {
       console.error(err);
     } finally {
@@ -220,18 +194,12 @@ export default function ZHDashboard({ user, onLogout }) {
     }
   };
 
-  const handleSaveTpv = async (row) => {
+  const handleSaveTpv = (row) => {
     setUpdatingRowId(row.rowId);
     try {
-      const res = await fetch(`/api/entries/${row.entryId}/row`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kpiType: row.kpiType, tpv: Number(tempTpvValue) || 0 })
-      });
-      if (res.ok) {
-        fetchZHData();
-        setEditingTpvRowId(null);
-      }
+      dataService.updateKpiRow(row.entryId, { kpiType: row.kpiType, tpv: Number(tempTpvValue) || 0 });
+      fetchZHData();
+      setEditingTpvRowId(null);
     } catch (err) {
       console.error(err);
     } finally {

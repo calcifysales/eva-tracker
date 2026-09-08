@@ -11,6 +11,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { dataService } from "../services/dataService.js";
 
 export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUploadSuccess }) {
   const [file, setFile] = useState(null);
@@ -86,7 +87,7 @@ export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUpload
     }
   };
 
-  const handleConfirmUpload = async () => {
+  const handleConfirmUpload = () => {
     if (parsedRows.length === 0) {
       setErrorMsg("No valid records to upload.");
       return;
@@ -96,49 +97,16 @@ export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUpload
     setErrorMsg("");
     setSuccessMsg("");
 
-    const CHUNK_SIZE = 200;
-    let totalImported = 0;
-    let totalSkipped = 0;
-
     try {
-      for (let i = 0; i < parsedRows.length; i += CHUNK_SIZE) {
-        const chunk = parsedRows.slice(i, i + CHUNK_SIZE);
-        const progressPercent = Math.min(100, Math.round(((i + chunk.length) / parsedRows.length) * 100));
-        setSuccessMsg(`Importing rows ${i + 1} to ${i + chunk.length} of ${parsedRows.length} (${progressPercent}%)...`);
-
-        const res = await fetch("/api/admin/upload-activities", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activities: chunk, role })
-        });
-
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          if (res.status === 413) {
-            throw new Error("File payload too large for the hosting server. Try uploading in smaller batches.");
-          }
-          throw new Error(`Server returned status ${res.status}. Please check server connection.`);
-        }
-
-        if (!res.ok) {
-          throw new Error(data?.error || `Upload failed with status ${res.status}.`);
-        }
-
-        totalImported += (data.importedCount || 0);
-        totalSkipped += (data.skippedCount || 0);
-      }
-
-      setSuccessMsg(`Successfully imported ${totalImported} activities!`);
+      const data = dataService.uploadActivities(parsedRows);
+      setSuccessMsg(`Successfully imported ${data.importedCount} activities!`);
       if (onUploadSuccess) {
-        onUploadSuccess({ importedCount: totalImported, skippedCount: totalSkipped });
+        onUploadSuccess(data);
       }
 
       setTimeout(() => {
         onClose();
-      }, 1800);
+      }, 1200);
     } catch (err) {
       setErrorMsg(err.message || "Failed to upload activities.");
     } finally {
@@ -193,22 +161,22 @@ export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUpload
             <span>Need the official format? Download standard templates:</span>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <a
-              href="/api/admin/template/excel"
-              download="Calcify_Activity_Upload_Template.xlsx"
-              className="px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg font-semibold flex items-center gap-1.5 shadow-2xs transition-colors text-[11px]"
+            <button
+              type="button"
+              onClick={() => dataService.downloadTemplate("excel")}
+              className="px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg font-semibold flex items-center gap-1.5 shadow-2xs transition-colors text-[11px] cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Excel Template (.xlsx)</span>
-            </a>
-            <a
-              href="/api/admin/template/csv"
-              download="Calcify_Activity_Upload_Template.csv"
-              className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-semibold flex items-center gap-1.5 shadow-2xs transition-colors text-[11px]"
+            </button>
+            <button
+              type="button"
+              onClick={() => dataService.downloadTemplate("csv")}
+              className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-semibold flex items-center gap-1.5 shadow-2xs transition-colors text-[11px] cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5" />
               <span>CSV Template (.csv)</span>
-            </a>
+            </button>
           </div>
         </div>
 

@@ -77,47 +77,34 @@ Open **[http://localhost:5050](http://localhost:5050)** in your browser.
 
 ---
 
-## 🚀 How to Deploy to GitHub (Zero Errors)
+## 🚀 100% GitHub-Only Deployment (GitHub Pages)
 
-### Step 1: Create a New Repository on GitHub
-1. Go to [github.com/new](https://github.com/new).
-2. Name your repository (e.g. `calcify-suite`).
-3. Set visibility to **Public** or **Private**.
-4. **Do not** initialize with README, .gitignore, or license (we already have them configured).
-5. Click **Create repository**.
+**Calcify_Suite** is configured to run completely and natively inside **GitHub** via **GitHub Pages & GitHub Actions**, requiring **NO external platforms or third-party servers** (no Render.com, no Heroku, no cloud databases).
 
-### Step 2: Push Your Code to GitHub
-Run the following commands in your terminal:
-
-```bash
-# Link your local repository to GitHub (replace <YOUR_USERNAME> and <REPO_NAME>)
-git remote add origin https://github.com/<YOUR_USERNAME>/calcify-suite.git
-
-# Push the main branch to GitHub
-git push -u origin main
-```
+### How to Activate Live Site in GitHub:
+1. Push your repository to GitHub (or double-click `Upload-To-GitHub.bat` on your Desktop).
+2. Open your repository on GitHub: `https://github.com/calcifysales/calcify-suite`.
+3. Click **Settings** (tab at the top) -> Click **Pages** (in the left sidebar).
+4. Under **Build and deployment**:
+   - For **Source**, select: **GitHub Actions**.
+5. That's it! GitHub Actions will automatically build and publish your site.
+6. Your permanent live link is:
+   👉 **`https://calcifysales.github.io/calcify-suite/`**
 
 ---
 
-## 🌐 How to Deploy the Live Site Online (Free Full-Stack Hosting)
+## 💻 Local Development
 
-Because **Calcify_Suite** is a full-stack platform with a Node.js Express backend and persistent JSON storage, it requires a Node runtime to process logins, PINs, form submissions, and Excel exports.
+```bash
+# 1. Clone the repository
+git clone https://github.com/calcifysales/calcify-suite.git
+cd calcify-suite
 
-### Recommended: Deploy on [Render.com](https://render.com) (100% Free)
+# 2. Install dependencies & run development server
+npm run dev
+```
 
-1. Sign up or log in to [Render.com](https://render.com) with your GitHub account.
-2. Click **New +** -> **Web Service**.
-3. Select your GitHub repository (`calcify-suite`).
-4. Configure the settings:
-   - **Name**: `calcify-suite` (or your chosen name)
-   - **Environment**: `Node`
-   - **Region**: Any close region (e.g. Singapore / Frankfurt / Oregon)
-   - **Branch**: `main`
-   - **Build Command**: `npm run build`
-   - **Start Command**: `npm start`
-   - **Instance Type**: `Free`
-5. Click **Deploy Web Service**.
-6. Render will automatically build the client and launch the server. Within 2 minutes, you will have a live public HTTPS URL (e.g., `https://calcify-suite.onrender.com`) that works on both mobile and desktop!
+Open `http://localhost:5173` to run locally.
 
 ---
 
