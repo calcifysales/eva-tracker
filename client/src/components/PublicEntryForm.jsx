@@ -15,6 +15,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { dataService } from "../services/dataService.js";
+import logoImg from "../assets/logo.png";
 
 export default function PublicEntryForm({ onBackToLanding }) {
   const today = new Date().toISOString().split("T")[0];
@@ -135,7 +136,7 @@ export default function PublicEntryForm({ onBackToLanding }) {
       id: "Successfull REKYC",
       name: "Successfull REKYC",
       label: "Successfull REKYC",
-      question: "Type",
+      question: "Select Type (Individual / Non-Individual)",
       options: [{ label: "Individual" }, { label: "Non-Individual" }]
     }
   ];
@@ -204,11 +205,18 @@ export default function PublicEntryForm({ onBackToLanding }) {
         /* Form Card with Activity Dropdown */
         <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-7 shadow-sm">
           <div className="mb-5 border-b border-slate-100 pb-4 flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Calcify Logo"
-              className="h-9 sm:h-10 w-auto object-contain rounded-lg"
-            />
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              className="cursor-pointer transition-transform hover:scale-105 focus:outline-none"
+              title="Return to Home"
+            >
+              <img
+                src={logoImg}
+                alt="Calcify Logo"
+                className="h-9 sm:h-10 w-auto object-contain rounded-lg"
+              />
+            </button>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-phonepe-900 leading-tight">
                 Daily Sales Entry Form
@@ -445,7 +453,7 @@ export default function PublicEntryForm({ onBackToLanding }) {
             {formData.activity === "Successfull REKYC" && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-2">
-                  <span>{currentActivityObj?.question || "Type"}</span>
+                  <span>{currentActivityObj?.question || "Select Type (Individual / Non-Individual)"}</span>
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">

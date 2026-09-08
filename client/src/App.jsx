@@ -11,8 +11,10 @@ import {
   Sparkles,
   ArrowRight,
   Layers,
-  ShieldCheck
+  ShieldCheck,
+  Home
 } from "lucide-react";
+import logoImg from "./assets/logo.png";
 import PublicEntryForm from "./components/PublicEntryForm.jsx";
 import AgentDashboard from "./components/AgentDashboard.jsx";
 import CMDashboard from "./components/CMDashboard.jsx";
@@ -71,6 +73,20 @@ export default function App() {
     fetchMeta();
   }, []);
 
+  // Safety guard: prevent blank screen if viewing a dashboard without a matching logged-in user
+  useEffect(() => {
+    if (currentView.endsWith("_dash")) {
+      if (!currentUser) {
+        setCurrentView("landing");
+      } else {
+        const expected = `${currentUser.role}_dash`;
+        if (currentView !== expected) {
+          setCurrentView(expected);
+        }
+      }
+    }
+  }, [currentView, currentUser]);
+
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     localStorage.setItem("calcify_user", JSON.stringify(user));
@@ -103,13 +119,17 @@ export default function App() {
           {/* Brand Logo */}
           <button
             type="button"
-            onClick={() => setCurrentView(currentUser ? `${currentUser.role}_dash` : "landing")}
-            className="flex items-center cursor-pointer group"
+            onClick={() => {
+              setCurrentView("landing");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="flex items-center cursor-pointer group focus:outline-none"
+            title="Return to Home"
           >
             <img
-              src="/logo.png"
+              src={logoImg}
               alt="Calcify Logo"
-              className="h-10 w-auto object-contain rounded-lg"
+              className="h-10 w-auto object-contain rounded-lg transition-transform group-hover:scale-105"
             />
           </button>
 
@@ -118,14 +138,19 @@ export default function App() {
             {/* If Logged In, Show User Badge */}
             {currentUser && (
               <div className="hidden sm:flex items-center gap-2 pr-3 border-r border-slate-200">
-                <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView(`${currentUser.role}_dash`)}
+                  className="text-right cursor-pointer hover:opacity-80 transition-opacity focus:outline-none"
+                  title="Go to Dashboard"
+                >
                   <span className="text-xs font-bold text-slate-900 block leading-tight">
                     {currentUser.name}
                   </span>
                   <span className="text-[10px] text-phonepe-700 uppercase font-semibold">
                     {currentUser.role === "developer" ? "Developer Studio" : currentUser.role === "zh" ? "Zonal Head" : currentUser.role === "cm" ? "Cluster Manager" : "Agent"}
                   </span>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -227,6 +252,35 @@ export default function App() {
 
                 <div className="border-t border-slate-100 my-4"></div>
 
+                {/* Return Home */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuDrawerOpen(false);
+                    setCurrentView("landing");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="w-full text-left p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Home className="w-4 h-4 text-phonepe-700" />
+                  <span>Home (Main Screen)</span>
+                </button>
+
+                {/* If Logged In, Dashboard Link */}
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuDrawerOpen(false);
+                      setCurrentView(`${currentUser.role}_dash`);
+                    }}
+                    className="w-full text-left p-3 bg-phonepe-50 hover:bg-phonepe-100 border border-phonepe-200 rounded-xl text-xs font-bold text-phonepe-900 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-phonepe-700" />
+                    <span>My Dashboard ({currentUser.name})</span>
+                  </button>
+                )}
+
                 {/* Agent Portal Quick Action */}
                 <button
                   type="button"
@@ -280,7 +334,7 @@ export default function App() {
               {/* Subtitle / Title banner */}
               <div>
                 <img
-                  src="/logo.png"
+                  src={logoImg}
                   alt="Calcify Logo"
                   className="h-20 w-auto mx-auto object-contain mb-2 drop-shadow-sm"
                 />
@@ -370,6 +424,22 @@ export default function App() {
         {currentView === "developer_dash" && currentUser?.role === "developer" && (
           <DeveloperDashboard user={currentUser} onLogout={handleLogout} />
         )}
+
+        {/* Fallback to prevent blank screen */}
+        {currentView !== "landing" &&
+          currentView !== "form" &&
+          (!currentUser || currentView !== `${currentUser?.role}_dash`) && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <p className="text-slate-600 text-sm mb-4">Please log in to view this portal.</p>
+              <button
+                type="button"
+                onClick={() => setCurrentView("landing")}
+                className="px-5 py-2.5 bg-phonepe-700 hover:bg-phonepe-800 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shadow-sm"
+              >
+                Return to Home
+              </button>
+            </div>
+          )}
       </main>
 
       {/* Universal Footer */}

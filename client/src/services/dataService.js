@@ -37,7 +37,7 @@ export const DEFAULT_FORM_QUESTIONS = {
       id: "Successfull REKYC",
       name: "Successfull REKYC",
       label: "Successfull REKYC",
-      question: "REKYC Status",
+      question: "Select Type (Individual / Non-Individual)",
       options: [
         { label: "Individual", points: 2 },
         { label: "Non-Individual", points: 3 }
