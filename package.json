@@ -1,0 +1,21 @@
+{
+  "name": "calcify-suite",
+  "version": "1.0.0",
+  "description": "Calcify_Suite - Sales Agent Performance & Salary Calculation Tracking Platform",
+  "type": "module",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "cd client && npm install && npm run build",
+    "dev": "node server/server.js",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
+  }
+}

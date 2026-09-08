@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#f8f6fc] text-slate-800 min-h-screen antialiased selection:bg-purple-600 selection:text-white font-['Plus_Jakarta_Sans',sans-serif];
+  }
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #f1ecf7;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7b5df;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a382cf;
+}

@@ -1,0 +1,138 @@
+{
+  "evaRate": 82,
+  "currency": "₹",
+  "kpiPoints": {
+    "soDone": {
+      "3499": 18,
+      "Preferred Base": 15,
+      "Untagged Base": 10
+    },
+    "premiumAcquisition": {
+      "Non-Individual": 8,
+      "Individual": 3
+    },
+    "rekyc": {
+      "Individual": 2,
+      "Non-Individual": 3
+    },
+    "customKpis": []
+  },
+  "formQuestions": {
+    "activities": [
+      {
+        "id": "SO",
+        "name": "SO",
+        "label": "SO (Sales Order)",
+        "question": "SO Done",
+        "options": [
+          {
+            "label": "3499",
+            "points": 18
+          },
+          {
+            "label": "Preferred Base",
+            "points": 15
+          },
+          {
+            "label": "Untagged Base",
+            "points": 10
+          }
+        ]
+      },
+      {
+        "id": "Premium Acquisition",
+        "name": "Premium Acquisition",
+        "label": "Premium Acquisition",
+        "question": "Premium Acquisition",
+        "options": [
+          {
+            "label": "Non-Individual",
+            "points": 3
+          },
+          {
+            "label": "Individual",
+            "points": 8
+          }
+        ]
+      },
+      {
+        "id": "Successfull REKYC",
+        "name": "Successfull REKYC",
+        "label": "Successfull REKYC",
+        "question": "Type",
+        "options": [
+          {
+            "label": "Individual",
+            "points": 2
+          },
+          {
+            "label": "Non-Individual",
+            "points": 8
+          }
+        ]
+      }
+    ]
+  },
+  "clusterManagers": [
+    "Sriteja Mallepalli",
+    "Mullapudi Sai",
+    "Gireesh Pavalla",
+    "Mohd Shafi",
+    "Doppa Anil Kumar",
+    "Chaitanya",
+    "Sajja Vinay Kumar"
+  ],
+  "questions": [
+    {
+      "id": "mobile",
+      "label": "Mobile Number",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "dateOfSale",
+      "label": "Date of Sale",
+      "type": "date",
+      "required": true
+    },
+    {
+      "id": "merchantId",
+      "label": "Merchant Id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "storeId",
+      "label": "Store Id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "cbsName",
+      "label": "CBS Name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "id": "soDone",
+      "label": "SO Done",
+      "type": "select",
+      "options": [
+        "3499",
+        "Preferred Base",
+        "Untagged Base"
+      ],
+      "required": true
+    },
+    {
+      "id": "premiumAcquisition",
+      "label": "Premium Acquisition",
+      "type": "select",
+      "options": [
+        "Non-Individual",
+        "Individual"
+      ],
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+name: Build & Verify Calcify_Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install root dependencies
+      run: npm install
+
+    - name: Install client dependencies & build Vite bundle
+      run: |
+        cd client
+        npm install
+        npm run build
+
+    - name: Verify build artifact exists
+      run: |
+        test -f client/dist/index.html
+        echo "Build successful! index.html verified."
