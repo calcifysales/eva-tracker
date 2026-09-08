@@ -1126,6 +1126,6 @@ app.get("*", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Calcify_Suite server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Calcify_Suite server running on http://0.0.0.0:${PORT}`);
 });
