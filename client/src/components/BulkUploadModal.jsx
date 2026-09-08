@@ -94,22 +94,46 @@ export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUpload
 
     setUploading(true);
     setErrorMsg("");
+    setSuccessMsg("");
+
+    const CHUNK_SIZE = 200;
+    let totalImported = 0;
+    let totalSkipped = 0;
 
     try {
-      const res = await fetch("/api/admin/upload-activities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activities: parsedRows, role })
-      });
+      for (let i = 0; i < parsedRows.length; i += CHUNK_SIZE) {
+        const chunk = parsedRows.slice(i, i + CHUNK_SIZE);
+        const progressPercent = Math.min(100, Math.round(((i + chunk.length) / parsedRows.length) * 100));
+        setSuccessMsg(`Importing rows ${i + 1} to ${i + chunk.length} of ${parsedRows.length} (${progressPercent}%)...`);
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Upload failed.");
+        const res = await fetch("/api/admin/upload-activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activities: chunk, role })
+        });
+
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          if (res.status === 413) {
+            throw new Error("File payload too large for the hosting server. Try uploading in smaller batches.");
+          }
+          throw new Error(`Server returned status ${res.status}. Please check server connection.`);
+        }
+
+        if (!res.ok) {
+          throw new Error(data?.error || `Upload failed with status ${res.status}.`);
+        }
+
+        totalImported += (data.importedCount || 0);
+        totalSkipped += (data.skippedCount || 0);
       }
 
-      setSuccessMsg(data.message || `Successfully imported ${data.importedCount} activities!`);
+      setSuccessMsg(`Successfully imported ${totalImported} activities!`);
       if (onUploadSuccess) {
-        onUploadSuccess(data);
+        onUploadSuccess({ importedCount: totalImported, skippedCount: totalSkipped });
       }
 
       setTimeout(() => {
@@ -280,15 +304,34 @@ export default function BulkUploadModal({ isOpen, onClose, role = "zh", onUpload
                   <tbody className="divide-y divide-slate-100">
                     {parsedRows.slice(0, 15).map((row, idx) => {
                       const mob = String(row.mobile || row["ACE Number"] || row["ACE"] || row["aceNumber"] || row["Mobile Number"] || row["Mobile"] || row["Agent Mobile"] || "");
-                      const act = String(row.activity || row["Activity"] || "SO");
-                      const sub = String(row.subActivity || row["Sub Activity"] || row["Option"] || row["SO Done"] || "");
-                      const v = String(row.isValid || row["Valid Status"] || row["Valid"] || "No");
+                      const act = String(row.activity || row["Activity"] || row["KPI Category"] || "SO");
+                      const sub = String(
+                        row.subActivity || row["Sub Activity"] || row["Option"] || row["SO Done"] ||
+                        row["KPI Selected Option"] || row["Premium Acquisition"] || row["rekycValue"] || ""
+                      );
+
+                      let v = String(row.isValid || row["Valid Status"] || row["Valid"] || "No");
+                      if (act.toLowerCase().includes("rekyc") || act.toLowerCase().includes("kyc")) {
+                        v = "Yes";
+                      }
+
                       const tpv = row.tpv || row["TPV (₹)"] || row["TPV"] || 0;
+
+                      const rawDate = row.dateOfSale || row["Date of Sale"] || row["Date"] || "—";
+                      let displayDate = String(rawDate).slice(0, 10);
+                      const numDate = Number(rawDate);
+                      if (!isNaN(numDate) && numDate > 30000 && numDate < 70000) {
+                        try {
+                          displayDate = new Date((numDate - 25569) * 86400 * 1000).toISOString().slice(0, 10);
+                        } catch (e) {
+                          displayDate = String(rawDate);
+                        }
+                      }
 
                       return (
                         <tr key={idx} className="hover:bg-slate-50">
                           <td className="py-1.5 px-2.5 text-slate-400 font-mono">{idx + 1}</td>
-                          <td className="py-1.5 px-2.5 font-mono">{String(row.dateOfSale || row["Date of Sale"] || row["Date"] || "—").slice(0, 10)}</td>
+                          <td className="py-1.5 px-2.5 font-mono">{displayDate}</td>
                           <td className="py-1.5 px-2.5 font-mono font-semibold text-slate-800">{mob}</td>
                           <td className="py-1.5 px-2.5 uppercase font-mono">{row.merchantId || row["Merchant ID"] || "—"}</td>
                           <td className="py-1.5 px-2.5 uppercase font-mono">{row.storeId || row["Store ID"] || "—"}</td>

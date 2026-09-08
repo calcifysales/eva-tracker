@@ -13,7 +13,8 @@ const app = express();
 const PORT = process.env.PORT || 5050;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ----------------------------------------------------
 // 1. PUBLIC METADATA & ENTRY FORM
@@ -802,6 +803,20 @@ app.post("/api/admin/upload-activities", (req, res) => {
     const cleanMobile = rawMobile.slice(-10);
 
     const rawDate = item.dateOfSale || item["Date of Sale"] || item["Date"] || item["date"] || new Date().toISOString().slice(0, 10);
+    let parsedDate = String(rawDate).slice(0, 10);
+    const numDate = Number(rawDate);
+    if (!isNaN(numDate) && numDate > 30000 && numDate < 70000) {
+      const d = new Date((numDate - 25569) * 86400 * 1000);
+      parsedDate = d.toISOString().slice(0, 10);
+    } else if (String(rawDate).includes("/")) {
+      const parts = String(rawDate).trim().split("/");
+      if (parts.length === 3) {
+        const p0 = parts[0].padStart(2, "0");
+        const p1 = parts[1].padStart(2, "0");
+        const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+        parsedDate = `${y}-${p0}-${p1}`;
+      }
+    }
     const merchantId = String(item.merchantId || item["Merchant ID"] || item["Merchant Id"] || item["MID"] || `M_${Date.now()}_${index}`).trim();
     const storeId = String(item.storeId || item["Store ID"] || item["Store Id"] || item["SID"] || `S_${Date.now()}_${index}`).trim();
     const cbsName = String(item.cbsName || item["CBS Name"] || item["Store Name"] || item["CBS"] || "Uploaded CBS").trim();
@@ -861,7 +876,7 @@ app.post("/api/admin/upload-activities", (req, res) => {
       mobile: cleanMobile,
       agentName,
       clusterManager,
-      dateOfSale: String(rawDate).slice(0, 10),
+      dateOfSale: parsedDate,
       merchantId,
       storeId,
       cbsName,
