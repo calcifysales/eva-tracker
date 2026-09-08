@@ -45,9 +45,9 @@ echo ======================================================================
 echo   [SUCCESS] Code uploaded to GitHub!
 echo.
 echo   To view your live site deployed within GitHub:
-echo   1. Open: https://github.com/calcifysales/calcify-suite/settings/pages
+echo   1. Open: https://github.com/calcifysales/eva-tracker/settings/pages
 echo   2. Under 'Build and deployment' -> 'Source', select: 'GitHub Actions'
-echo   3. Your live link will be: https://calcifysales.github.io/calcify-suite/
+echo   3. Your live link will be: https://calcifysales.github.io/eva-tracker/
 echo ======================================================================
 echo.
 pause

@@ -89,7 +89,7 @@ Open **[http://localhost:5050](http://localhost:5050)** in your browser.
    - For **Source**, select: **GitHub Actions**.
 5. That's it! GitHub Actions will automatically build and publish your site.
 6. Your permanent live link is:
-   👉 **`https://calcifysales.github.io/calcify-suite/`**
+   👉 **`https://calcifysales.github.io/eva-tracker/`**
 
 ---
 
