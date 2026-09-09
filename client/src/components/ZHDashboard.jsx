@@ -59,6 +59,7 @@ export default function ZHDashboard({ user, onLogout }) {
   const [deleteRowError, setDeleteRowError] = useState("");
 
   // Form Questions & KPI Editing Modal/Tab
+  const [configMonth, setConfigMonth] = useState(thisMonthStr);
   const [formQuestions, setFormQuestions] = useState(null);
   const [editEvaRate, setEditEvaRate] = useState(82);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -73,14 +74,23 @@ export default function ZHDashboard({ user, onLogout }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiData, setAiData] = useState(null);
 
+  const loadZhRatesForMonth = (m) => {
+    try {
+      const mCfg = dataService.getSettingsForMonth(m);
+      setEditEvaRate(mCfg.evaRate || 82);
+      setFormQuestions(mCfg.formQuestions || null);
+    } catch (err) {
+      console.error("Error loading ZH settings for month:", err);
+    }
+  };
+
   const fetchZHData = () => {
     setLoading(true);
     try {
       const data = dataService.getKpiData({ role: "zh" });
       setRows(data.rows || []);
       setKpiSettings(data.kpiSettings);
-      setEditEvaRate(data.kpiSettings?.evaRate || 82);
-      setFormQuestions(data.kpiSettings?.formQuestions || null);
+      loadZhRatesForMonth(configMonth);
     } catch (err) {
       console.error("Failed to load ZH entries:", err);
     } finally {
@@ -117,6 +127,8 @@ export default function ZHDashboard({ user, onLogout }) {
           const latestMonth = dates[0].slice(0, 7);
           setSelectedMonth(latestMonth);
           setSelectedDay(dates[0]);
+          setConfigMonth(latestMonth);
+          loadZhRatesForMonth(latestMonth);
         }
       }
     }
@@ -134,14 +146,17 @@ export default function ZHDashboard({ user, onLogout }) {
     setSettingsSuccess(false);
 
     try {
-      dataService.updateSettings({
-        evaRate: Number(editEvaRate) || 82,
-        formQuestions: formQuestions
-      });
+      dataService.updateSettings(
+        {
+          evaRate: Number(editEvaRate) || 82,
+          formQuestions: formQuestions
+        },
+        configMonth
+      );
 
       setSettingsSuccess(true);
       fetchZHData();
-      setTimeout(() => setSettingsSuccess(false), 2500);
+      setTimeout(() => setSettingsSuccess(false), 3000);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -843,20 +858,41 @@ export default function ZHDashboard({ user, onLogout }) {
       {/* ==================================================== */}
       {activeTab === "form_config" && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Form Questions & EVA Configuration
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Form Questions & EVA Configuration
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-phonepe-100 text-phonepe-800 border border-phonepe-200">
+                  Month: {configMonth}
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Make additions and corrections to Activities, questions, and EVA point values.
+                Configure payout rate, activities, questions, and EVA point values for the selected month.
               </p>
             </div>
-            {settingsSuccess && (
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold animate-in fade-in">
-                Saved successfully!
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
+                <label className="text-xs font-bold text-slate-700">Month:</label>
+                <input
+                  type="month"
+                  value={configMonth}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setConfigMonth(e.target.value);
+                      loadZhRatesForMonth(e.target.value);
+                    }
+                  }}
+                  className="bg-white border border-slate-300 rounded-lg px-2 py-0.5 text-xs font-bold text-phonepe-800 focus:outline-none focus:ring-1 focus:ring-phonepe-500 cursor-pointer"
+                />
+              </div>
+              {settingsSuccess && (
+                <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold animate-in fade-in">
+                  Saved for {configMonth}!
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Rate Setting */}

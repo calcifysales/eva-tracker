@@ -69,6 +69,7 @@ export default function DeveloperDashboard({ user, onLogout }) {
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
   // Simple visual rates settings state
+  const [configMonth, setConfigMonth] = useState(thisMonthStr);
   const [rateEva, setRateEva] = useState(82);
   const [pointsSO3499, setPointsSO3499] = useState(5);
   const [pointsSOPref, setPointsSOPref] = useState(3);
@@ -90,6 +91,24 @@ export default function DeveloperDashboard({ user, onLogout }) {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiResponse, setAiResponse] = useState(null);
 
+  const loadRatesForMonth = (targetMonth) => {
+    try {
+      const mCfg = dataService.getSettingsForMonth(targetMonth);
+      setRateEva(mCfg.evaRate || 82);
+      if (mCfg.kpiPoints) {
+        setPointsSO3499(mCfg.kpiPoints.soDone?.["3499"] ?? 5);
+        setPointsSOPref(mCfg.kpiPoints.soDone?.["Preferred Base"] ?? 3);
+        setPointsSOUntag(mCfg.kpiPoints.soDone?.["Untagged Base"] ?? 1);
+        setPointsPANonInd(mCfg.kpiPoints.premiumAcquisition?.["Non-Individual"] ?? 4);
+        setPointsPAInd(mCfg.kpiPoints.premiumAcquisition?.["Individual"] ?? 2);
+        setPointsRekycInd(mCfg.kpiPoints.rekyc?.["Individual"] ?? mCfg.kpiPoints.rekyc?.["Done"] ?? 2);
+        setPointsRekycNonInd(mCfg.kpiPoints.rekyc?.["Non-Individual"] ?? 3);
+      }
+    } catch (e) {
+      console.error("Failed to load rates for month:", e);
+    }
+  };
+
   const loadData = () => {
     setLoading(true);
     try {
@@ -107,19 +126,9 @@ export default function DeveloperDashboard({ user, onLogout }) {
       const eData = dataService.getKpiData({ role: "developer" });
       setRows(eData.rows || []);
       if (eData.kpiSettings) {
-        const s = eData.kpiSettings;
-        setKpiSettings(s);
-        setRateEva(s.evaRate || 82);
-        if (s.kpiPoints) {
-          setPointsSO3499(s.kpiPoints.soDone?.["3499"] ?? 5);
-          setPointsSOPref(s.kpiPoints.soDone?.["Preferred Base"] ?? 3);
-          setPointsSOUntag(s.kpiPoints.soDone?.["Untagged Base"] ?? 1);
-          setPointsPANonInd(s.kpiPoints.premiumAcquisition?.["Non-Individual"] ?? 4);
-          setPointsPAInd(s.kpiPoints.premiumAcquisition?.["Individual"] ?? 2);
-          setPointsRekycInd(s.kpiPoints.rekyc?.["Individual"] ?? s.kpiPoints.rekyc?.["Done"] ?? 2);
-          setPointsRekycNonInd(s.kpiPoints.rekyc?.["Non-Individual"] ?? 3);
-        }
+        setKpiSettings(eData.kpiSettings);
       }
+      loadRatesForMonth(configMonth);
     } catch (err) {
       console.error("Developer load error:", err);
     } finally {
@@ -141,12 +150,14 @@ export default function DeveloperDashboard({ user, onLogout }) {
           const latestMonth = dates[0].slice(0, 7);
           setSelectedMonth(latestMonth);
           setSelectedDay(dates[0]);
+          setConfigMonth(latestMonth);
+          loadRatesForMonth(latestMonth);
         }
       }
     }
   }, [rows]);
 
-  // Save settings (Rates & Points)
+  // Save settings (Rates & Points for specific month)
   const handleSaveRates = () => {
     setSavingSettings(true);
     setSettingsSuccess(false);
@@ -171,10 +182,10 @@ export default function DeveloperDashboard({ user, onLogout }) {
         }
       };
 
-      dataService.updateSettings(updatedPayload);
+      dataService.updateSettings(updatedPayload, configMonth);
       setSettingsSuccess(true);
       loadData();
-      setTimeout(() => setSettingsSuccess(false), 3000);
+      setTimeout(() => setSettingsSuccess(false), 3500);
     } catch (err) {
       console.error("Failed to save settings:", err);
     } finally {
@@ -663,39 +674,59 @@ export default function DeveloperDashboard({ user, onLogout }) {
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Sliders className="w-4 h-4 text-phonepe-700" />
-              <span>Platform Rates & EVA Points Configuration</span>
-            </h2>
+              <h2 className="text-base font-bold text-slate-900">Platform Rates & EVA Points Configuration</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-phonepe-100 text-phonepe-800 border border-phonepe-200">
+                Month: {configMonth}
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Adjust base payout rate and points per activity option. Updates automatically recalculate tentative payout for all users.
+              Select month to configure. Saving applies changes to that month's EVA structure and automatically recalculates all submissions.
             </p>
           </div>
 
-          <button
-            type="button"
-            disabled={savingSettings}
-            onClick={handleSaveRates}
-            className="px-4 py-2 bg-phonepe-700 hover:bg-phonepe-800 text-white font-bold rounded-xl text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
-          >
-            {savingSettings ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Saving Changes...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Platform Rates</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
+              <label className="text-xs font-bold text-slate-700">Target Month:</label>
+              <input
+                type="month"
+                value={configMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setConfigMonth(e.target.value);
+                    loadRatesForMonth(e.target.value);
+                  }
+                }}
+                className="bg-white border border-slate-300 rounded-lg px-2 py-0.5 text-xs font-bold text-phonepe-800 focus:outline-none focus:ring-1 focus:ring-phonepe-500 cursor-pointer"
+              />
+            </div>
+
+            <button
+              type="button"
+              disabled={savingSettings}
+              onClick={handleSaveRates}
+              className="px-4 py-2 bg-phonepe-700 hover:bg-phonepe-800 text-white font-bold rounded-xl text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+            >
+              {savingSettings ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Rates for {configMonth}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {settingsSuccess && (
           <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span>Platform rates successfully updated and applied!</span>
+            <span>Platform rates for month <strong>{configMonth}</strong> successfully updated and auto-applied to all submissions!</span>
           </div>
         )}
 
@@ -857,7 +888,7 @@ export default function DeveloperDashboard({ user, onLogout }) {
         </div>
 
         <div className="overflow-x-auto border border-slate-100 rounded-xl">
-          <table className="w-full text-left border-collapse min-w-[980px]">
+          <table className="w-full text-left border-collapse min-w-[1080px]">
             <thead>
               <tr className="bg-slate-50 text-[11px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200">
                 <th className="py-2.5 px-3">Date</th>
@@ -870,13 +901,15 @@ export default function DeveloperDashboard({ user, onLogout }) {
                 <th className="py-2.5 px-3 text-right">TPV (₹)</th>
                 <th className="py-2.5 px-3 text-right">Gross EVA</th>
                 <th className="py-2.5 px-3 text-right">Valid EVA</th>
+                <th className="py-2.5 px-3 text-right">EVA Rate</th>
+                <th className="py-2.5 px-3 text-right">Tentative Pay</th>
                 <th className="py-2.5 px-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-400">
+                  <td colSpan={13} className="py-8 text-center text-slate-400">
                     No form submissions found.
                   </td>
                 </tr>
@@ -923,6 +956,12 @@ export default function DeveloperDashboard({ user, onLogout }) {
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
                       {row.validEva}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                      ₹{row.evaRate || 82}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                      ₹{(row.tentativePay || 0).toLocaleString("en-IN")}
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <button

@@ -9,7 +9,9 @@ import {
   KeyRound,
   AlertCircle,
   Crown,
-  UserCheck
+  UserCheck,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { dataService } from "../services/dataService.js";
 
@@ -27,6 +29,7 @@ export function AgentAuthModal({ isOpen, onClose, onLoginSuccess, meta }) {
   const [isSignup, setIsSignup] = useState(false);
   const [mobile, setMobile] = useState("");
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [name, setName] = useState("");
   const [clusterManager, setClusterManager] = useState("");
   const [loading, setLoading] = useState(false);
@@ -176,15 +179,25 @@ export function AgentAuthModal({ isOpen, onClose, onLoginSuccess, meta }) {
               <Lock className="w-3.5 h-3.5 text-phonepe-700" />
               <span>4-Digit PIN</span>
             </label>
-            <input
-              type="password"
-              required
-              maxLength={4}
-              placeholder="Enter 4-digit PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500"
-            />
+            <div className="relative">
+              <input
+                type={showPin ? "text" : "password"}
+                required
+                maxLength={4}
+                placeholder="Enter 4-digit PIN"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+                title={showPin ? "Hide PIN" : "Show PIN"}
+              >
+                {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button
@@ -237,6 +250,7 @@ export function AdminAuthModal({ isOpen, onClose, role = "zh", quotas, onLoginSu
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -396,14 +410,24 @@ export function AdminAuthModal({ isOpen, onClose, role = "zh", quotas, onLoginSu
               <KeyRound className="w-3.5 h-3.5 text-phonepe-700" />
               <span>Password</span>
             </label>
-            <input
-              type="password"
-              required
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           <button

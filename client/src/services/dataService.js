@@ -66,6 +66,7 @@ const DEFAULT_SETTINGS = {
     },
     customKpis: []
   },
+  monthlySettings: {},
   formQuestions: DEFAULT_FORM_QUESTIONS,
   clusterManagers: CLUSTER_MANAGERS_LIST
 };
@@ -193,21 +194,144 @@ export const dataService = {
     return {
       ...DEFAULT_SETTINGS,
       ...s,
+      kpiPoints: {
+        ...DEFAULT_SETTINGS.kpiPoints,
+        ...(s.kpiPoints || {})
+      },
+      monthlySettings: s.monthlySettings || {},
       formQuestions: s.formQuestions || DEFAULT_FORM_QUESTIONS,
       clusterManagers: CLUSTER_MANAGERS_LIST
     };
   },
 
-  updateSettings(newSettings) {
+  getSettingsForMonth(monthStr, baseSettings = null) {
+    const current = baseSettings || this.getSettings();
+    const cleanMonth = (monthStr || "").trim().slice(0, 7);
+    const monthConfig = cleanMonth && current.monthlySettings ? current.monthlySettings[cleanMonth] : null;
+
+    if (monthConfig) {
+      return {
+        evaRate: monthConfig.evaRate !== undefined ? Number(monthConfig.evaRate) : (current.evaRate || 82),
+        currency: current.currency || "₹",
+        kpiPoints: {
+          soDone: {
+            ...(current.kpiPoints?.soDone || DEFAULT_SETTINGS.kpiPoints.soDone),
+            ...(monthConfig.kpiPoints?.soDone || {})
+          },
+          premiumAcquisition: {
+            ...(current.kpiPoints?.premiumAcquisition || DEFAULT_SETTINGS.kpiPoints.premiumAcquisition),
+            ...(monthConfig.kpiPoints?.premiumAcquisition || {})
+          },
+          rekyc: {
+            ...(current.kpiPoints?.rekyc || DEFAULT_SETTINGS.kpiPoints.rekyc),
+            ...(monthConfig.kpiPoints?.rekyc || {})
+          },
+          customKpis: monthConfig.kpiPoints?.customKpis || current.kpiPoints?.customKpis || []
+        },
+        formQuestions: monthConfig.formQuestions || current.formQuestions || DEFAULT_FORM_QUESTIONS,
+        clusterManagers: current.clusterManagers || CLUSTER_MANAGERS_LIST
+      };
+    }
+
+    return {
+      evaRate: current.evaRate || 82,
+      currency: current.currency || "₹",
+      kpiPoints: current.kpiPoints || DEFAULT_SETTINGS.kpiPoints,
+      formQuestions: current.formQuestions || DEFAULT_FORM_QUESTIONS,
+      clusterManagers: current.clusterManagers || CLUSTER_MANAGERS_LIST
+    };
+  },
+
+  updateSettings(newSettings, monthStr = null) {
     const current = this.getSettings();
+    const cleanMonth = monthStr ? String(monthStr).trim().slice(0, 7) : null;
+    let updatedMonthly = { ...(current.monthlySettings || {}) };
+
+    // Synchronize kpiPoints and formQuestions
+    let resolvedKpi = {
+      soDone: {
+        ...(current.kpiPoints?.soDone || DEFAULT_SETTINGS.kpiPoints.soDone),
+        ...(newSettings.kpiPoints?.soDone || {})
+      },
+      premiumAcquisition: {
+        ...(current.kpiPoints?.premiumAcquisition || DEFAULT_SETTINGS.kpiPoints.premiumAcquisition),
+        ...(newSettings.kpiPoints?.premiumAcquisition || {})
+      },
+      rekyc: {
+        ...(current.kpiPoints?.rekyc || DEFAULT_SETTINGS.kpiPoints.rekyc),
+        ...(newSettings.kpiPoints?.rekyc || {})
+      },
+      customKpis: newSettings.kpiPoints?.customKpis || current.kpiPoints?.customKpis || []
+    };
+
+    let resolvedFormQuestions = JSON.parse(
+      JSON.stringify(newSettings.formQuestions || current.formQuestions || DEFAULT_FORM_QUESTIONS)
+    );
+
+    // If newSettings came with formQuestions, extract points to resolvedKpi
+    if (newSettings.formQuestions?.activities) {
+      newSettings.formQuestions.activities.forEach((act) => {
+        const idLower = (act.id || act.name || "").toLowerCase();
+        if (idLower.includes("so")) {
+          act.options?.forEach((o) => { resolvedKpi.soDone[o.label] = Number(o.points) || 0; });
+        } else if (idLower.includes("prem") || idLower.includes("acq")) {
+          act.options?.forEach((o) => { resolvedKpi.premiumAcquisition[o.label] = Number(o.points) || 0; });
+        } else if (idLower.includes("rekyc") || idLower.includes("kyc")) {
+          act.options?.forEach((o) => { resolvedKpi.rekyc[o.label] = Number(o.points) || 0; });
+        }
+      });
+    } else if (newSettings.kpiPoints) {
+      // If newSettings came with kpiPoints, update formQuestions options points
+      (resolvedFormQuestions.activities || []).forEach((act) => {
+        const idLower = (act.id || act.name || "").toLowerCase();
+        if (idLower.includes("so")) {
+          act.options?.forEach((o) => {
+            if (resolvedKpi.soDone[o.label] !== undefined) o.points = resolvedKpi.soDone[o.label];
+          });
+        } else if (idLower.includes("prem") || idLower.includes("acq")) {
+          act.options?.forEach((o) => {
+            if (resolvedKpi.premiumAcquisition[o.label] !== undefined) o.points = resolvedKpi.premiumAcquisition[o.label];
+          });
+        } else if (idLower.includes("rekyc") || idLower.includes("kyc")) {
+          act.options?.forEach((o) => {
+            if (resolvedKpi.rekyc[o.label] !== undefined) o.points = resolvedKpi.rekyc[o.label];
+          });
+        }
+      });
+    }
+
+    if (cleanMonth) {
+      const existingMonth = this.getSettingsForMonth(cleanMonth, current);
+      const updatedMonthKpi = {
+        soDone: {
+          ...(existingMonth.kpiPoints?.soDone || {}),
+          ...resolvedKpi.soDone
+        },
+        premiumAcquisition: {
+          ...(existingMonth.kpiPoints?.premiumAcquisition || {}),
+          ...resolvedKpi.premiumAcquisition
+        },
+        rekyc: {
+          ...(existingMonth.kpiPoints?.rekyc || {}),
+          ...resolvedKpi.rekyc
+        },
+        customKpis: resolvedKpi.customKpis
+      };
+
+      updatedMonthly[cleanMonth] = {
+        evaRate: newSettings.evaRate !== undefined ? Number(newSettings.evaRate) : existingMonth.evaRate,
+        kpiPoints: updatedMonthKpi,
+        formQuestions: resolvedFormQuestions
+      };
+    }
+
     const updated = {
       ...current,
       ...newSettings,
-      kpiPoints: {
-        ...current.kpiPoints,
-        ...(newSettings.kpiPoints || {})
-      },
-      formQuestions: newSettings.formQuestions || current.formQuestions || DEFAULT_FORM_QUESTIONS
+      evaRate: newSettings.evaRate !== undefined ? Number(newSettings.evaRate) : current.evaRate,
+      kpiPoints: resolvedKpi,
+      monthlySettings: updatedMonthly,
+      formQuestions: resolvedFormQuestions
     };
     setLocal(STORAGE_KEYS.SETTINGS, updated);
     return updated;
@@ -590,11 +714,7 @@ export const dataService = {
   // ENRICHED KPI ROWS & AGENT RANKINGS
   // ----------------------------------------------------
   computeEnrichedKpiRows(entries, settings = null) {
-    const cfg = settings || this.getSettings();
-    const evaRate = Number(cfg.evaRate) || 82;
-    const soPoints = cfg.kpiPoints?.soDone || { "3499": 5, "Preferred Base": 3, "Untagged Base": 1 };
-    const premPoints = cfg.kpiPoints?.premiumAcquisition || { "Non-Individual": 4, "Individual": 2 };
-    const rekycPoints = cfg.kpiPoints?.rekyc || { "Individual": 2, "Non-Individual": 3, "Done": 2 };
+    const baseSettings = settings || this.getSettings();
 
     const countMap = {};
     entries.forEach((e) => {
@@ -617,9 +737,34 @@ export const dataService = {
       const isDuplicate = Boolean(mId && sId && countMap[key] > 1);
       const activity = entry.activity || (entry.soDone ? "SO" : (entry.premiumAcquisition ? "Premium Acquisition" : "Successfull REKYC"));
 
+      const stdDate = standardizeDate(entry.dateOfSale) || entry.dateOfSale || "";
+      const rowMonth = stdDate ? stdDate.slice(0, 7) : new Date().toISOString().slice(0, 7);
+
+      // Fetch month-specific rates & points for this entry's month
+      const cfg = this.getSettingsForMonth(rowMonth, baseSettings);
+      const evaRate = Number(cfg.evaRate) || 82;
+      const soPoints = cfg.kpiPoints?.soDone || { "3499": 5, "Preferred Base": 3, "Untagged Base": 1 };
+      const premPoints = cfg.kpiPoints?.premiumAcquisition || { "Non-Individual": 4, "Individual": 2 };
+      const rekycPoints = cfg.kpiPoints?.rekyc || { "Individual": 2, "Non-Individual": 3, "Done": 2 };
+
       if (activity === "SO") {
-        const soVal = entry.soDone || entry.kpiValue || "3499";
-        const soPts = Number(soPoints[soVal] !== undefined ? soPoints[soVal] : 3);
+        const rawVal = entry.soDone || entry.kpiValue || "";
+        let matchedKey = null;
+        if (rawVal) {
+          const rawTrim = String(rawVal).trim().toLowerCase();
+          for (const k of Object.keys(soPoints)) {
+            if (k.toLowerCase() === rawTrim) { matchedKey = k; break; }
+          }
+          if (!matchedKey) {
+            if (rawTrim === "3499" || rawTrim.includes("3499")) matchedKey = "3499";
+            else if (rawTrim.includes("pref") || rawTrim.includes("preferred")) matchedKey = "Preferred Base";
+            else if (rawTrim.includes("untag") || rawTrim.includes("untagged")) matchedKey = "Untagged Base";
+          }
+        }
+        const chosenOption = matchedKey || "3499";
+        const fallbackPts = Number(soPoints["3499"] ?? Object.values(soPoints)[0] ?? 5);
+        const soPts = Number(soPoints[chosenOption] !== undefined ? soPoints[chosenOption] : fallbackPts);
+
         const soValid = (entry.soValid === "Yes" || entry.isValid === "Yes") ? "Yes" : "No";
         const soValidEva = soValid === "Yes" ? soPts : 0;
         const soTentativePay = soValidEva * evaRate;
@@ -630,11 +775,12 @@ export const dataService = {
           entryId: entry.id,
           activity: "SO",
           kpiType: "SO Done",
-          kpiValue: soVal,
+          kpiValue: entry.soDone || entry.kpiValue || chosenOption,
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
+          dateOfSale: stdDate,
+          monthStr: rowMonth,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -648,8 +794,22 @@ export const dataService = {
           createdAt: entry.createdAt
         });
       } else if (activity === "Premium Acquisition") {
-        const premVal = entry.premiumAcquisition || entry.kpiValue || "Non-Individual";
-        const premPts = Number(premPoints[premVal] !== undefined ? premPoints[premVal] : 4);
+        const rawVal = entry.premiumAcquisition || entry.kpiValue || "";
+        let matchedKey = null;
+        if (rawVal) {
+          const rawTrim = String(rawVal).trim().toLowerCase();
+          for (const k of Object.keys(premPoints)) {
+            if (k.toLowerCase() === rawTrim) { matchedKey = k; break; }
+          }
+          if (!matchedKey) {
+            if (rawTrim.includes("non")) matchedKey = "Non-Individual";
+            else if (rawTrim.includes("ind")) matchedKey = "Individual";
+          }
+        }
+        const chosenOption = matchedKey || "Non-Individual";
+        const fallbackPts = Number(premPoints["Non-Individual"] ?? Object.values(premPoints)[0] ?? 4);
+        const premPts = Number(premPoints[chosenOption] !== undefined ? premPoints[chosenOption] : fallbackPts);
+
         const premValid = (entry.premValid === "Yes" || entry.isValid === "Yes") ? "Yes" : "No";
         const premValidEva = premValid === "Yes" ? premPts : 0;
         const premTentativePay = premValidEva * evaRate;
@@ -660,11 +820,12 @@ export const dataService = {
           entryId: entry.id,
           activity: "Premium Acquisition",
           kpiType: "Premium Acquisition",
-          kpiValue: premVal,
+          kpiValue: entry.premiumAcquisition || entry.kpiValue || chosenOption,
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
+          dateOfSale: stdDate,
+          monthStr: rowMonth,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -678,8 +839,22 @@ export const dataService = {
           createdAt: entry.createdAt
         });
       } else if (activity === "Successfull REKYC") {
-        const rekycVal = entry.rekycValue || entry.kpiValue || "Individual";
-        const rekycPts = Number(rekycPoints[rekycVal] !== undefined ? rekycPoints[rekycVal] : (rekycVal === "Non-Individual" ? 3 : 2));
+        const rawVal = entry.rekycValue || entry.kpiValue || "";
+        let matchedKey = null;
+        if (rawVal) {
+          const rawTrim = String(rawVal).trim().toLowerCase();
+          for (const k of Object.keys(rekycPoints)) {
+            if (k.toLowerCase() === rawTrim) { matchedKey = k; break; }
+          }
+          if (!matchedKey) {
+            if (rawTrim.includes("non")) matchedKey = "Non-Individual";
+            else matchedKey = "Individual";
+          }
+        }
+        const chosenOption = matchedKey || "Individual";
+        const fallbackPts = Number(rekycPoints[chosenOption] ?? (chosenOption === "Non-Individual" ? 3 : 2));
+        const rekycPts = Number(rekycPoints[chosenOption] !== undefined ? rekycPoints[chosenOption] : fallbackPts);
+
         const rekycValid = "Yes";
         const rekycValidEva = rekycPts;
         const rekycTentativePay = rekycValidEva * evaRate;
@@ -690,11 +865,12 @@ export const dataService = {
           entryId: entry.id,
           activity: "Successfull REKYC",
           kpiType: "Successfull REKYC",
-          kpiValue: rekycVal,
+          kpiValue: entry.rekycValue || entry.kpiValue || chosenOption,
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
+          dateOfSale: stdDate,
+          monthStr: rowMonth,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -913,9 +1089,9 @@ export const dataService = {
       let rekycValue = null;
 
       if (activity === "SO") {
-        soDone = subValue || "3499";
+        soDone = (!subValue || subValue.toLowerCase() === "na" || subValue.toLowerCase() === "n/a") ? "3499" : subValue;
       } else if (activity === "Premium Acquisition") {
-        premiumAcquisition = subValue || "Non-Individual";
+        premiumAcquisition = (!subValue || subValue.toLowerCase() === "na" || subValue.toLowerCase() === "n/a") ? "Non-Individual" : subValue;
       } else if (activity === "Successfull REKYC") {
         rekycValue = subValue.toLowerCase().includes("non") ? "Non-Individual" : "Individual";
       }
