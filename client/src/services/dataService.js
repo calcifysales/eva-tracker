@@ -97,6 +97,93 @@ function setLocal(key, value) {
   }
 }
 
+export function standardizeDate(d) {
+  if (!d && d !== 0) return "";
+  const s = String(d).trim();
+  if (!s) return "";
+
+  // 1. Check Excel serial number (numeric, e.g. 45543, 46273)
+  const num = Number(s);
+  if (!isNaN(num) && num > 20000 && num < 85000) {
+    const dt = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getUTCFullYear();
+      const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(dt.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+  }
+
+  // 2. Strip time component if ISO or whitespace (e.g. "2026-09-08T14:32:00.000Z")
+  let datePart = s.split("T")[0].split(" ")[0].trim();
+
+  // 3. Normalize delimiters: replace slashes and dots with dashes
+  datePart = datePart.replace(/[\/\.]/g, "-");
+  const parts = datePart.split("-").map((p) => p.trim());
+
+  if (parts.length === 3) {
+    const [p0, p1, p2] = parts;
+    const n0 = parseInt(p0, 10);
+    const n1 = parseInt(p1, 10);
+    const n2 = parseInt(p2, 10);
+
+    // Case A: Year is first (YYYY-MM-DD or corrupted YYYY-DD-MM)
+    if (p0.length === 4 && !isNaN(n0)) {
+      const y = p0;
+      if (n1 > 12 && n2 <= 12) {
+        // Swap corrupted month and day (e.g. 2026-24-09 -> 2026-09-24)
+        const m = String(n2).padStart(2, "0");
+        const day = String(n1).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      } else {
+        const m = String(n1).padStart(2, "0");
+        const day = String(n2).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+    }
+
+    // Case B: Year is last (DD-MM-YYYY or MM-DD-YYYY or DD-MM-YY)
+    if ((p2.length === 4 || p2.length === 2) && !isNaN(n2)) {
+      const y = p2.length === 4 ? p2 : `20${p2.padStart(2, "0")}`;
+      // In Indian business context (and PhonePe), standard format is DD-MM-YYYY
+      if (n0 > 12 || (n0 <= 12 && n1 <= 12)) {
+        const day = String(n0).padStart(2, "0");
+        const m = String(n1).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      } else {
+        const m = String(n0).padStart(2, "0");
+        const day = String(n1).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+    }
+  }
+
+  // 4. Fallback to native Date parser
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  return s.slice(0, 10);
+}
+
+export function matchesDateFilter(rowDate, filterType, selectedMonth, selectedDay) {
+  if (filterType === "all") return true;
+  if (!rowDate) return false;
+  const std = standardizeDate(rowDate);
+  if (!std) return false;
+  if (filterType === "month") {
+    return std.slice(0, 7) === selectedMonth;
+  }
+  if (filterType === "day") {
+    return std === selectedDay;
+  }
+  return true;
+}
+
 export const dataService = {
   // ----------------------------------------------------
   // SETTINGS & METADATA
@@ -373,7 +460,22 @@ export const dataService = {
   // ENTRIES & FORM SUBMISSION
   // ----------------------------------------------------
   getEntries() {
-    return getLocal(STORAGE_KEYS.ENTRIES, []);
+    const rawList = getLocal(STORAGE_KEYS.ENTRIES, []);
+    let mutated = false;
+    const normalized = rawList.map((e) => {
+      if (e.dateOfSale) {
+        const std = standardizeDate(e.dateOfSale);
+        if (std && std !== e.dateOfSale) {
+          mutated = true;
+          return { ...e, dateOfSale: std };
+        }
+      }
+      return e;
+    });
+    if (mutated) {
+      setLocal(STORAGE_KEYS.ENTRIES, normalized);
+    }
+    return normalized;
   },
 
   saveEntries(entries) {
@@ -458,7 +560,7 @@ export const dataService = {
       mobile: cleanMobile,
       agentName,
       clusterManager,
-      dateOfSale: dateOfSale || new Date().toISOString().slice(0, 10),
+      dateOfSale: standardizeDate(dateOfSale) || new Date().toISOString().slice(0, 10),
       merchantId: merchantId.trim(),
       storeId: storeId.trim(),
       cbsName: cbsName.trim(),
@@ -532,7 +634,7 @@ export const dataService = {
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: entry.dateOfSale,
+          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -562,7 +664,7 @@ export const dataService = {
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: entry.dateOfSale,
+          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -592,7 +694,7 @@ export const dataService = {
           mobile: entry.mobile,
           agentName: entry.agentName || "Agent (" + (entry.mobile || "").slice(-4) + ")",
           clusterManager: entry.clusterManager || "Unassigned",
-          dateOfSale: entry.dateOfSale,
+          dateOfSale: standardizeDate(entry.dateOfSale) || entry.dateOfSale,
           merchantId: entry.merchantId,
           storeId: entry.storeId,
           cbsName: entry.cbsName,
@@ -759,21 +861,18 @@ export const dataService = {
       }
       const cleanMobile = rawMobile.slice(-10);
 
-      const rawDate = item.dateOfSale || item["Date of Sale"] || item["Date"] || item["date"] || new Date().toISOString().slice(0, 10);
-      let parsedDate = String(rawDate).slice(0, 10);
-      const numDate = Number(rawDate);
-      if (!isNaN(numDate) && numDate > 30000 && numDate < 70000) {
-        const d = new Date((numDate - 25569) * 86400 * 1000);
-        parsedDate = d.toISOString().slice(0, 10);
-      } else if (String(rawDate).includes("/")) {
-        const parts = String(rawDate).trim().split("/");
-        if (parts.length === 3) {
-          const p0 = parts[0].padStart(2, "0");
-          const p1 = parts[1].padStart(2, "0");
-          const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-          parsedDate = `${y}-${p0}-${p1}`;
-        }
-      }
+      const rawDate =
+        item.dateOfSale ||
+        item["Date of Sale"] ||
+        item["Date of sale"] ||
+        item["Date"] ||
+        item["date"] ||
+        item["DATE"] ||
+        item["Sale Date"] ||
+        item["Date of Sale "] ||
+        item["dateOfSale"] ||
+        new Date().toISOString().slice(0, 10);
+      const parsedDate = standardizeDate(rawDate) || new Date().toISOString().slice(0, 10);
 
       const merchantId = String(item.merchantId || item["Merchant ID"] || item["Merchant Id"] || item["MID"] || `M_${Date.now()}_${index}`).trim();
       const storeId = String(item.storeId || item["Store ID"] || item["Store Id"] || item["SID"] || `S_${Date.now()}_${index}`).trim();

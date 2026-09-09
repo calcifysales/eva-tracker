@@ -23,13 +23,14 @@ import {
   Award,
   Layers,
   HelpCircle,
-  X
+  X,
+  Calendar
 } from "lucide-react";
 import ZHDashboard from "./ZHDashboard.jsx";
 import CMDashboard from "./CMDashboard.jsx";
 import AgentDashboard from "./AgentDashboard.jsx";
 import BulkUploadModal from "./BulkUploadModal.jsx";
-import { dataService } from "../services/dataService.js";
+import { dataService, standardizeDate, matchesDateFilter } from "../services/dataService.js";
 
 export default function DeveloperDashboard({ user, onLogout }) {
   // Navigation: "studio" | "zh_view" | "cm_view" | "agent_view"
@@ -43,6 +44,13 @@ export default function DeveloperDashboard({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [kpiSettings, setKpiSettings] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  // Day and Month wise filter (defaults to Month wise)
+  const todayStr = new Date().toISOString().split("T")[0];
+  const thisMonthStr = todayStr.slice(0, 7);
+  const [dateFilterType, setDateFilterType] = useState("month"); // "all", "month", "day"
+  const [selectedMonth, setSelectedMonth] = useState(thisMonthStr);
+  const [selectedDay, setSelectedDay] = useState(todayStr);
 
   // Submissions search & filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -122,6 +130,21 @@ export default function DeveloperDashboard({ user, onLogout }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-focus latest available month if no records match default month
+  useEffect(() => {
+    if (rows && rows.length > 0) {
+      const hasCurrentMonth = rows.some((r) => matchesDateFilter(r.dateOfSale, "month", selectedMonth, ""));
+      if (!hasCurrentMonth) {
+        const dates = rows.map((r) => standardizeDate(r.dateOfSale)).filter(Boolean).sort().reverse();
+        if (dates.length > 0) {
+          const latestMonth = dates[0].slice(0, 7);
+          setSelectedMonth(latestMonth);
+          setSelectedDay(dates[0]);
+        }
+      }
+    }
+  }, [rows]);
 
   // Save settings (Rates & Points)
   const handleSaveRates = () => {
@@ -246,16 +269,20 @@ export default function DeveloperDashboard({ user, onLogout }) {
     }
   };
 
-  // Metrics calculation
-  const totalEntries = rows.length;
+  // Filter rows by date for metrics and submissions
+  const dateFilteredRows = rows.filter((r) =>
+    matchesDateFilter(r.dateOfSale, dateFilterType, selectedMonth, selectedDay)
+  );
+
+  const totalEntries = dateFilteredRows.length;
   const totalUsers = (users.cms?.length || 0) + (users.agents?.length || 0);
-  const totalTpv = rows.reduce((s, r) => s + (r.tpv || 0), 0);
-  const totalGrossEva = rows.reduce((s, r) => s + (r.grossEva || 0), 0);
-  const totalValidEva = rows.reduce((s, r) => s + (r.validEva || 0), 0);
-  const totalPayout = rows.reduce((s, r) => s + (r.tentativePay || 0), 0);
+  const totalTpv = dateFilteredRows.reduce((s, r) => s + (r.tpv || 0), 0);
+  const totalGrossEva = dateFilteredRows.reduce((s, r) => s + (r.grossEva || 0), 0);
+  const totalValidEva = dateFilteredRows.reduce((s, r) => s + (r.validEva || 0), 0);
+  const totalPayout = dateFilteredRows.reduce((s, r) => s + (r.tentativePay || 0), 0);
 
   // Filtered rows for Submissions Manager
-  const filteredRows = rows.filter((r) => {
+  const filteredRows = dateFilteredRows.filter((r) => {
     const matchesSearch =
       (r.agentName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.merchantId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -512,6 +539,76 @@ export default function DeveloperDashboard({ user, onLogout }) {
               <ArrowRight className="w-3 h-3 text-amber-700" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Date Filter Bar (Defaults to Month Wise) */}
+      <div className="bg-white border border-slate-200 rounded-xl py-2 px-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mr-1">
+            <Calendar className="w-3.5 h-3.5 text-phonepe-700" />
+            Date Filter:
+          </span>
+
+          <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setDateFilterType("all")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                dateFilterType === "all"
+                  ? "bg-white text-phonepe-800 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              type="button"
+              onClick={() => setDateFilterType("month")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                dateFilterType === "month"
+                  ? "bg-white text-phonepe-800 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Month wise
+            </button>
+            <button
+              type="button"
+              onClick={() => setDateFilterType("day")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                dateFilterType === "day"
+                  ? "bg-white text-phonepe-800 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Day wise
+            </button>
+          </div>
+
+          {dateFilterType === "month" && (
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500 cursor-pointer"
+            />
+          )}
+
+          {dateFilterType === "day" && (
+            <input
+              type="date"
+              value={selectedDay}
+              onChange={(e) => setSelectedDay(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-phonepe-500 cursor-pointer"
+            />
+          )}
+        </div>
+
+        <div className="text-xs text-slate-500">
+          Showing: <strong className="text-slate-800">{filteredRows.length}</strong> of <strong className="text-slate-800">{rows.length}</strong> submissions
+          {dateFilterType === "month" && <span className="text-phonepe-700 font-bold ml-1">({selectedMonth})</span>}
+          {dateFilterType === "day" && <span className="text-phonepe-700 font-bold ml-1">({selectedDay})</span>}
         </div>
       </div>
 

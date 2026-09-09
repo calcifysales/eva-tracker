@@ -23,7 +23,7 @@ import {
   UploadCloud
 } from "lucide-react";
 import BulkUploadModal from "./BulkUploadModal.jsx";
-import { dataService } from "../services/dataService.js";
+import { dataService, standardizeDate, matchesDateFilter } from "../services/dataService.js";
 
 export default function ZHDashboard({ user, onLogout }) {
   const [rows, setRows] = useState([]);
@@ -41,8 +41,8 @@ export default function ZHDashboard({ user, onLogout }) {
   const [filterKpi, setFilterKpi] = useState("all");
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
 
-  // Day and Month wise Filters
-  const [dateFilterType, setDateFilterType] = useState("all"); // "all", "month", "day"
+  // Day and Month wise Filters (defaults to Month wise)
+  const [dateFilterType, setDateFilterType] = useState("month"); // "all", "month", "day"
   const todayStr = new Date().toISOString().split("T")[0];
   const thisMonthStr = todayStr.slice(0, 7); // "YYYY-MM"
   const [selectedMonth, setSelectedMonth] = useState(thisMonthStr);
@@ -106,6 +106,21 @@ export default function ZHDashboard({ user, onLogout }) {
   useEffect(() => {
     fetchZHData();
   }, []);
+
+  // Auto-focus latest available month if no records match default month
+  useEffect(() => {
+    if (rows && rows.length > 0) {
+      const hasCurrentMonth = rows.some((r) => matchesDateFilter(r.dateOfSale, "month", selectedMonth, ""));
+      if (!hasCurrentMonth) {
+        const dates = rows.map((r) => standardizeDate(r.dateOfSale)).filter(Boolean).sort().reverse();
+        if (dates.length > 0) {
+          const latestMonth = dates[0].slice(0, 7);
+          setSelectedMonth(latestMonth);
+          setSelectedDay(dates[0]);
+        }
+      }
+    }
+  }, [rows]);
 
   useEffect(() => {
     if (activeTab === "users") {
@@ -211,13 +226,7 @@ export default function ZHDashboard({ user, onLogout }) {
   // FILTER ROWS (INCLUDING DAY & MONTH WISE)
   // ----------------------------------------------------
   const filteredRows = rows.filter((r) => {
-    // 1. Day and Month wise filter
-    const matchesDate =
-      dateFilterType === "month"
-        ? (r.dateOfSale || "").startsWith(selectedMonth)
-        : dateFilterType === "day"
-        ? r.dateOfSale === selectedDay
-        : true;
+    const matchesDate = matchesDateFilter(r.dateOfSale, dateFilterType, selectedMonth, selectedDay);
 
     // 2. Cluster Filter
     const matchesCluster = filterCluster === "all" ? true : r.clusterManager === filterCluster;

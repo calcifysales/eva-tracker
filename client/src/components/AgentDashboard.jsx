@@ -16,7 +16,7 @@ import {
   RefreshCw,
   Award
 } from "lucide-react";
-import { dataService } from "../services/dataService.js";
+import { dataService, standardizeDate, matchesDateFilter } from "../services/dataService.js";
 
 export default function AgentDashboard({ user, onLogout }) {
   const [rows, setRows] = useState([]);
@@ -28,10 +28,10 @@ export default function AgentDashboard({ user, onLogout }) {
   const [filterValid, setFilterValid] = useState("all"); // "all", "Yes", "No"
   const [filterDuplicate, setFilterDuplicate] = useState(false);
 
-  // Day and Month wise date filter
+  // Day and Month wise date filter (defaults to Month wise)
   const todayStr = new Date().toISOString().split("T")[0];
   const thisMonthStr = todayStr.slice(0, 7);
-  const [dateFilterType, setDateFilterType] = useState("all"); // "all", "month", "day"
+  const [dateFilterType, setDateFilterType] = useState("month"); // "all", "month", "day"
   const [selectedMonth, setSelectedMonth] = useState(thisMonthStr);
   const [selectedDay, setSelectedDay] = useState(todayStr);
 
@@ -66,6 +66,21 @@ export default function AgentDashboard({ user, onLogout }) {
       fetchAgentRows();
     }
   }, [user?.mobile]);
+
+  // Auto-focus latest available month if no records match default month
+  useEffect(() => {
+    if (rows && rows.length > 0) {
+      const hasCurrentMonth = rows.some((r) => matchesDateFilter(r.dateOfSale, "month", selectedMonth, ""));
+      if (!hasCurrentMonth) {
+        const dates = rows.map((r) => standardizeDate(r.dateOfSale)).filter(Boolean).sort().reverse();
+        if (dates.length > 0) {
+          const latestMonth = dates[0].slice(0, 7);
+          setSelectedMonth(latestMonth);
+          setSelectedDay(dates[0]);
+        }
+      }
+    }
+  }, [rows]);
 
   // Toggle Valid (Yes / No) - Editable by Agent
   const handleToggleValid = (row) => {
@@ -121,12 +136,7 @@ export default function AgentDashboard({ user, onLogout }) {
 
   // Filtered rows (including Day & Month wise)
   const filteredRows = rows.filter((r) => {
-    const matchesDate =
-      dateFilterType === "month"
-        ? (r.dateOfSale || "").startsWith(selectedMonth)
-        : dateFilterType === "day"
-        ? r.dateOfSale === selectedDay
-        : true;
+    const matchesDate = matchesDateFilter(r.dateOfSale, dateFilterType, selectedMonth, selectedDay);
 
     const matchesSearch =
       (r.merchantId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
